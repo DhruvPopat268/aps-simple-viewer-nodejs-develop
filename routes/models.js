@@ -56,7 +56,7 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
         res.json({
             name: obj.objectKey,
             urn,
-            viewerUrl: `https://autocad-file-backend.onrender.com#${urn}`
+            viewerUrl: `http://localhost:8080#${urn}`
         });
     } catch (err) {
         next(err);
