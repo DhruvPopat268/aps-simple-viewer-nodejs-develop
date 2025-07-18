@@ -41,9 +41,9 @@ router.get('/api/models/:urn/status', async function (req, res, next) {
 });
 
 router.post('/api/models', formidable({ maxFileSize: Infinity }), async function (req, res, next) {
-    const file = req.files['model-file'];
+    const file = req.files['modelFile'];
     if (!file) {
-        res.status(400).send('The required field ("model-file") is missing.');
+        res.status(400).send('The required field ("modelFile") is missing.');
         return;
     }
 
@@ -56,7 +56,7 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
         res.json({
             name: obj.objectKey,
             urn,
-            viewerUrl: `http://localhost:8080#${urn}`
+            viewerUrl: `https://autocad-file-backend.onrender.com#${urn}`
         });
     } catch (err) {
         next(err);

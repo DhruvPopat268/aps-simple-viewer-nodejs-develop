@@ -38,7 +38,7 @@ async function setupModelUpload(viewer) {
         if (!file) return;
 
         let data = new FormData();
-        data.append('model-file', file);
+        data.append('modelFile', file);
 
         if (file.name.endsWith('.zip')) {
             const entrypoint = window.prompt('Please enter the filename of the main design inside the archive.');
