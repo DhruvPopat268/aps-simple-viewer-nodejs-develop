@@ -183,5 +183,43 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
     }
 });
 
+router.post('/api/test-download', async function (req, res) {
+    const { fileUrl } = req.body;
+    
+    if (!fileUrl) {
+        return res.status(400).json({ error: 'fileUrl is required' });
+    }
+    
+    try {
+        console.log('Testing download from:', fileUrl);
+        
+        const response = await axios({
+            method: 'HEAD', // Just get headers first
+            url: fileUrl,
+            timeout: 10000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+        });
+        
+        res.json({
+            success: true,
+            status: response.status,
+            headers: response.headers,
+            contentType: response.headers['content-type'],
+            contentLength: response.headers['content-length']
+        });
+        
+    } catch (err) {
+        console.error('Test download error:', err);
+        res.json({
+            success: false,
+            error: err.message,
+            code: err.code,
+            status: err.response?.status,
+            details: err.response?.data
+        });
+    }
+});
 
 module.exports = router;
