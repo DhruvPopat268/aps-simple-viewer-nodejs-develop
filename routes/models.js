@@ -116,7 +116,7 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
                 method: 'GET',
                 url: fileUrl,
                 responseType: 'stream',
-                timeout: 30000, // 30 second timeout
+                timeout: 300000, // 30 second timeout
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
                 },
