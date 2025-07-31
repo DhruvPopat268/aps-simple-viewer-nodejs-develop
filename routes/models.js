@@ -153,13 +153,22 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
             viewerUrl: `https://autocad-file-backend.onrender.com#${urn}`
         });
     } catch (err) {
-        console.error('Error in /api/models route:', err.message);
-        console.error('Error details:', {
-            code: err.code,
-            status: err.response?.status,
-            statusText: err.response?.statusText,
-            url: err.config?.url
-        });
+        console.error('Full error object:', err);
+        console.error('Error message:', err.message);
+        console.error('Error code:', err.code);
+        console.error('Error name:', err.name);
+        console.error('Error stack:', err.stack);
+        
+        if (err.response) {
+            console.error('Response status:', err.response.status);
+            console.error('Response statusText:', err.response.statusText);
+            console.error('Response headers:', err.response.headers);
+        }
+        
+        if (err.config) {
+            console.error('Request URL:', err.config.url);
+            console.error('Request method:', err.config.method);
+        }
         
         // Clean up temporary file in case of error
         if (isDownloadedFile && filePath && fs.existsSync(filePath)) {
@@ -171,15 +180,35 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
         }
         
         // Send appropriate error response
-        if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-            res.status(400).json({ error: 'Unable to reach the provided URL. Please check if the URL is accessible.' });
+        let errorMessage = 'Unknown error occurred';
+        
+        if (err.code === 'ENOTFOUND') {
+            errorMessage = 'Domain not found. Please check if the URL is valid.';
+        } else if (err.code === 'ECONNREFUSED') {
+            errorMessage = 'Connection refused. The server is not accepting connections.';
+        } else if (err.code === 'ETIMEDOUT') {
+            errorMessage = 'Request timed out. The file might be too large or server is slow.';
         } else if (err.response?.status === 404) {
-            res.status(404).json({ error: 'File not found at the provided URL.' });
+            errorMessage = 'File not found at the provided URL (404).';
         } else if (err.response?.status === 403) {
-            res.status(403).json({ error: 'Access denied. The file may require authentication.' });
-        } else {
-            res.status(500).json({ error: 'Failed to process the file from URL: ' + err.message });
+            errorMessage = 'Access denied. The file may require authentication (403).';
+        } else if (err.response?.status === 500) {
+            errorMessage = 'Server error at the provided URL (500).';
+        } else if (err.message) {
+            errorMessage = err.message;
+        } else if (err.name) {
+            errorMessage = `${err.name}: ${err.code || 'Unknown error code'}`;
         }
+        
+        res.status(500).json({ 
+            error: errorMessage,
+            details: {
+                code: err.code,
+                name: err.name,
+                status: err.response?.status,
+                url: err.config?.url
+            }
+        });
     }
 });
 
