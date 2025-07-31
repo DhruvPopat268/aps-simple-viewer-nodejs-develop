@@ -45,6 +45,15 @@ router.get('/api/models/:urn/status', async function (req, res, next) {
     }
 });
 
+function validateUrl(string) {
+    try {
+        const url = new URL(string);
+        return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (_) {
+        return false;
+    }
+}
+
 // router.post('/api/models', formidable({ maxFileSize: Infinity }), async function (req, res, next) {
 //     const file = req.files['modelFile'];
 //     if (!file) {
