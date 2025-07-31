@@ -13,6 +13,7 @@
     "@aps_sdk/authentication": "^1.0.0",
     "@aps_sdk/model-derivative": "^1.2.0",
     "@aps_sdk/oss": "^1.2.1",
+    "axios": "^1.11.0",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",
     "express-formidable": "^1.2.0",
