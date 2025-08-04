@@ -109,31 +109,100 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
                 fs.mkdirSync(tempDir, { recursive: true });
             }
             
-            // Download file from cloud URL
+            // Download file from cloud URL with enhanced configuration
             console.log('Attempting to download file from:', fileUrl);
             
-            const response = await axios({
+            // Create axios instance with custom configuration
+            const axiosInstance = axios.create({
+                timeout: 600000, // Increase to 10 minutes
+                maxRedirects: 10,
+                maxContentLength: Infinity,
+                maxBodyLength: Infinity,
+            });
+            
+            const response = await axiosInstance({
                 method: 'GET',
                 url: fileUrl,
                 responseType: 'stream',
-                timeout: 300000, // 30 second timeout
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                    'Accept': '*/*',
+                    'Accept-Encoding': 'gzip, deflate, br',
+                    'Connection': 'keep-alive',
+                    'Cache-Control': 'no-cache'
                 },
-                maxRedirects: 5,
                 validateStatus: function (status) {
                     return status >= 200 && status < 300;
+                },
+                // Add retry configuration
+                retry: 3,
+                retryDelay: (retryCount) => {
+                    return retryCount * 2000; // 2s, 4s, 6s delays
                 }
             });
             
             console.log('Download response status:', response.status);
             console.log('Content-Type:', response.headers['content-type']);
+            console.log('Content-Length:', response.headers['content-length']);
             
-            // Save the downloaded file
-            await pipeline(response.data, fs.createWriteStream(filePath));
+            // Create write stream with error handling
+            const writeStream = fs.createWriteStream(filePath);
+            
+            // Add progress tracking for large files
+            let downloadedBytes = 0;
+            const totalBytes = parseInt(response.headers['content-length']) || 0;
+            
+            response.data.on('data', (chunk) => {
+                downloadedBytes += chunk.length;
+                if (totalBytes > 0) {
+                    const progress = ((downloadedBytes / totalBytes) * 100).toFixed(2);
+                    console.log(`Download progress: ${progress}% (${downloadedBytes}/${totalBytes} bytes)`);
+                }
+            });
+            
+            // Use pipeline with better error handling
+            await new Promise((resolve, reject) => {
+                const stream = pipeline(response.data, writeStream, (error) => {
+                    if (error) {
+                        console.error('Pipeline error:', error);
+                        reject(error);
+                    } else {
+                        console.log('File downloaded successfully');
+                        resolve();
+                    }
+                });
+                
+                // Add timeout for the entire download process
+                const downloadTimeout = setTimeout(() => {
+                    writeStream.destroy();
+                    reject(new Error('Download timeout exceeded'));
+                }, 900000); // 15 minutes total timeout
+                
+                stream.on('finish', () => {
+                    clearTimeout(downloadTimeout);
+                });
+                
+                stream.on('error', (error) => {
+                    clearTimeout(downloadTimeout);
+                    reject(error);
+                });
+            });
+            
         } else {
             res.status(400).send('Either "modelFile" upload or "fileUrl" is required.');
             return;
+        }
+
+        // Verify file was downloaded/uploaded successfully
+        if (!fs.existsSync(filePath)) {
+            throw new Error('File was not successfully downloaded or uploaded');
+        }
+        
+        const fileStats = fs.statSync(filePath);
+        console.log(`File size: ${fileStats.size} bytes`);
+        
+        if (fileStats.size === 0) {
+            throw new Error('Downloaded file is empty');
         }
 
         // Continue with existing logic
@@ -152,6 +221,7 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
             urn,
             viewerUrl: `https://autocad-file-backend.onrender.com#${urn}`
         });
+        
     } catch (err) {
         console.error('Full error object:', err);
         console.error('Error message:', err.message);
@@ -187,13 +257,17 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
         } else if (err.code === 'ECONNREFUSED') {
             errorMessage = 'Connection refused. The server is not accepting connections.';
         } else if (err.code === 'ETIMEDOUT') {
-            errorMessage = 'Request timed out. The file might be too large or server is slow.';
+            errorMessage = 'Request timed out. The file might be too large or server is slow. Please try again or use a smaller file.';
+        } else if (err.code === 'ECONNRESET') {
+            errorMessage = 'Connection was reset by the server. Please try again.';
         } else if (err.response?.status === 404) {
             errorMessage = 'File not found at the provided URL (404).';
         } else if (err.response?.status === 403) {
             errorMessage = 'Access denied. The file may require authentication (403).';
         } else if (err.response?.status === 500) {
             errorMessage = 'Server error at the provided URL (500).';
+        } else if (err.message?.includes('timeout')) {
+            errorMessage = 'Download timeout exceeded. The file is too large or connection is too slow.';
         } else if (err.message) {
             errorMessage = err.message;
         } else if (err.name) {
@@ -206,12 +280,12 @@ router.post('/api/models', formidable({ maxFileSize: Infinity }), async function
                 code: err.code,
                 name: err.name,
                 status: err.response?.status,
-                url: err.config?.url
+                url: err.config?.url,
+                timeout: err.code === 'ETIMEDOUT' ? true : false
             }
         });
     }
 });
-
 router.post('/api/test-download', async function (req, res) {
     const { fileUrl } = req.body;
     
