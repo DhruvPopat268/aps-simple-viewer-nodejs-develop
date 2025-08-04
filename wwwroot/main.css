@@ -47,9 +47,12 @@ body, html {
 #header .title {
     flex: 1 0 auto;
     height: auto;
+    font-weight: bold;
+    font-size: 40px;
 }
 
 #models {
     flex: 0 1 auto;
     min-width: 2em;
+    display: none;
 }
